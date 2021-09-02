@@ -85,7 +85,15 @@ def conv3d():
                                 #wi_len = actual_s + (wo - 1) * stride_w;
                                 input = np.random.randint(low = 0, high = 1, size = (1, 1, actual_r, actual_s, 32)).astype('float32')
                                 if (cur_hi_len > 0 & cur_wi_len > 0) :
-                                    cur_input_data = inputs[n, d, cur_hi_offset : cur_hi_offset + cur_hi_len - 1, cur_wi_offset : cur_wi_offset + cur_wi_len - 1, ci] 
+
+                                    hi_cut_offset =  0 if cur_hi_offset < 0 else  cur_hi_offset
+                                    hi_cut_offset_end = Hi - 1 if cur_hi_offset_end > Hi - 1 else hi_cut_offset_end
+
+                                    wi_cut_offset = 0 if cur_wi_offset < 0 else  cur_wi_offset
+                                    wi_cut_offset_end = Wi - 1 if cur_wi_offset_end > Wi - 1 else wi_cut_offset_end
+
+                                    cur_input_data = inputs[n, d, hi_cut_offset : hi_cut_offset_end, wi_cut_offset : wi_cut_offset_end, ci] 
+                                    # np.pad(cur_input_data) https://blog.csdn.net/Tan_HandSome/article/details/80296827
                                 
 
 
@@ -94,3 +102,10 @@ def conv3d():
 if __name__ == "__main__":
     conv3d()
 
+# %%
+import numpy as  np
+a = np.zeros((5, 5))
+b = np.ones((3, 3))
+a[2:, 2:] = b
+print(a)
+# %%
