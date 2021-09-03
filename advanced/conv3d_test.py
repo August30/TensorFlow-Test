@@ -115,7 +115,7 @@ def conv3d():
                                 output_data += output
                                 # 3.将1*32的向量reshape为(1,1,1,1,32),放到outputs对应位置
                                 print("output_data:", output_data)
-                        co_len = Co - (c+1)*32 if (c+1)*32 > Co else (c+1)*32
+                        co_len = Co - c*32 if (c+1)*32 > Co else (c+1)*32
                         print(outputs[n, d, h, w, c*32:c*32+co_len].shape, output_data[:, :, :, :, :co_len].shape)
                         outputs[n, d, h, w, c*32:c*32+co_len] = output_data[:, :, :, :, :co_len]
 
