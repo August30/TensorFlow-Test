@@ -20,7 +20,7 @@ def conv3d():
     Hi = 9
     Wi = 9
     Ci = 17
-    Co = 32
+    Co = 33
     T = 3
     R = 3
     S = 3
@@ -76,6 +76,13 @@ def conv3d():
     co_loop_num = int((Co + 32 -1) / 32)
     t_loop_num = T
     ci_loop_num = int((Ci + 16 - 1) / 16)
+    print("n_loop_num:", n_loop_num)
+    print("do_loop_num:", do_loop_num)
+    print("ho_loop_num:", ho_loop_num)
+    print("wo_loop_num:", wo_loop_num)
+    print("co_loop_num:", co_loop_num)
+    print("t_loop_num:", t_loop_num)
+    print("ci_loop_num:", ci_loop_num)
 
     outputs = np.zeros((N, Do, Ho, Wo, Co), dtype="float32")
 
@@ -108,6 +115,8 @@ def conv3d():
                                 # print("cur_hi_len:", cur_hi_len)
                                 # print("cur_wi_len:", cur_wi_len)
                                 # print("cur_di_offset:", cur_di_offset)
+                                # print("cur_hi_offset:", cur_hi_offset)
+                                # print("cur_hi_offset_end:", cur_hi_offset_end)
                                 # print("t:", t)
 
                                 if (cur_hi_len > 0 and cur_wi_len > 0 and cur_di_offset + t >= 0) :
@@ -120,18 +129,21 @@ def conv3d():
 
                                     ci_len = 16 if (ci+1)*16 <= Ci else Ci - ci*16
 
-                                    cut_input_data = inputs[n, d+t, hi_cut_offset:hi_cut_offset_end, wi_cut_offset:wi_cut_offset_end, ci*16:ci*16+ci_len]
+                                    # 注意：python中切片右边是一个开区间，factor中的endoffset是一个闭区间
+                                    cut_input_data = inputs[n, d+t, hi_cut_offset:hi_cut_offset_end + 1, wi_cut_offset:wi_cut_offset_end + 1, ci*16:ci*16+ci_len]
                                     cut_input_data = cut_input_data[np.newaxis, np.newaxis, :, :, :]
 
                                     split_h_begin = -cur_hi_offset if cur_hi_offset < 0 else 0
-                                    split_h_end = split_h_begin + cur_hi_len - 1
+                                    split_h_end = split_h_begin + cur_hi_len 
                                     split_w_begin = -cur_wi_offset if cur_wi_offset < 0 else 0
-                                    split_w_end = split_w_begin + cur_wi_len - 1
+                                    split_w_end = split_w_begin + cur_wi_len 
                                    
                                     input[:, :, split_h_begin:split_h_end, split_w_begin:split_w_end, :ci_len] = cut_input_data
                                     # np.pad(cur_input_data) https://blog.csdn.net/Tan_HandSome/article/details/80296827
 
                                     kernel[:, :, :, :ci_len, :co_len] = kernels[t, :, :, ci*16:ci*16+ci_len, c*32:c*32+co_len]
+
+                                    
                                     # print("cut_input_data:", cut_input_data)
                                 
                                 # 计算
@@ -152,6 +164,7 @@ def conv3d():
                         outputs[n, d, h, w, c*32:c*32+co_len] = output_data[:, :, :, :, :co_len]
 
     print("outputs: ", outputs)
+    print("outputs_shape: ", outputs.shape)
 
 
 if __name__ == "__main__":
