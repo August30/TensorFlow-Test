@@ -163,8 +163,12 @@ def conv3d():
                         # print(outputs[n, d, h, w, c*32:c*32+co_len].shape, output_data[:, :, :, :, :co_len].shape)
                         outputs[n, d, h, w, c*32:c*32+co_len] = output_data[:, :, :, :, :co_len]
 
-    print("outputs: ", outputs)
+    # print("outputs: ", outputs)
     print("outputs_shape: ", outputs.shape)
+    outputs = outputs.transpose(0, 4, 1, 2, 3)
+    print("outputs_transpose: ", outputs)
+    print("outputs_transpose_shape: ", outputs.shape)
+
 
 
 if __name__ == "__main__":
