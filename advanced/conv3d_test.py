@@ -33,12 +33,12 @@ def conv3d():
     dilation_h = 1
     dilation_w = 1
 
-    pad_head = 0
-    pad_tail = 0
-    pad_top = 0
-    pad_bottom = 0
-    pad_left = 0
-    pad_right = 0
+    pad_head = 1
+    pad_tail = 1
+    pad_top = 1
+    pad_bottom = 1
+    pad_left = 1
+    pad_right = 1
 
     actual_t = (T - 1) * dilation_d + 1
     actual_r = (R - 1) * dilation_h + 1
