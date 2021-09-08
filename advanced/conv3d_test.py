@@ -1,20 +1,9 @@
 import numpy as np
+# from numpy.core.fromnumeric import shape
+# import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 def conv3d():
-    # N = 2
-    # Di = 224
-    # Hi = 131
-    # Wi = 113
-    # Ci = 61
-    # Co = 78
-    # T = 5
-    # R = 7
-    # S = 4
-
-    # stride_d = 2
-    # stride_h = 2
-    # stride_w = 7
-
     N = 2
     Di = 9
     Hi = 9
@@ -33,12 +22,21 @@ def conv3d():
     dilation_h = 1
     dilation_w = 1
 
-    pad_head = 1
-    pad_tail = 1
-    pad_top = 1
-    pad_bottom = 1
-    pad_left = 1
-    pad_right = 1
+    # SAME 
+    # pad_head = 1
+    # pad_tail = 1
+    # pad_top = 1
+    # pad_bottom = 1
+    # pad_left = 1
+    # pad_right = 1
+
+    # VALID
+    pad_head = 0
+    pad_tail = 0
+    pad_top = 0
+    pad_bottom = 0
+    pad_left = 0
+    pad_right = 0
 
     actual_t = (T - 1) * dilation_d + 1
     actual_r = (R - 1) * dilation_h + 1
@@ -95,8 +93,15 @@ def conv3d():
                         co_len = Co - c*32 if (c+1)*32 > Co else 32
                         
                         output_data = np.zeros((1, 1, 1, 1, 32), dtype="float32")
-                        t_beign = 0
-                        t_end = t_loop_num
+
+                        # t_beign = 0
+                        # t_end = t_loop_num
+
+                        # skip the head block
+                        t_beign = (pad_head - d * stride_d) if d * stride_d < pad_head else 0
+                        # drop the tail block
+                        t_end = (t_loop_num - pad_tail + (do_loop_num - d - 1) * stride_d) if (do_loop_num - d - 1) * stride_d < pad_tail else t_loop_num
+
                         for t in range(t_beign, t_end):
                             for ci in range(ci_loop_num):    
                                 cur_di_offset = d * stride_d - pad_head
@@ -119,7 +124,10 @@ def conv3d():
                                 # print("cur_hi_offset_end:", cur_hi_offset_end)
                                 # print("t:", t)
 
-                                if (cur_hi_len > 0 and cur_wi_len > 0 and cur_di_offset + t >= 0) :
+                                # 如果t_beign = 0，t_end = t_loop_num时可用下面的if判断，这样效率低一些，skip the head block 和  drop the tail block 可以少一些循环
+                                # if (cur_hi_len > 0 and cur_wi_len > 0 and cur_di_offset + t >= 0 and cur_di_offset + t < Di) :
+
+                                if (cur_hi_len > 0 and cur_wi_len > 0 and cur_di_offset + t >= 0 and cur_di_offset + t < Di) :
 
                                     hi_cut_offset =  0 if cur_hi_offset < 0 else  cur_hi_offset
                                     hi_cut_offset_end = Hi - 1 if cur_hi_offset_end > Hi - 1 else cur_hi_offset_end
@@ -129,8 +137,13 @@ def conv3d():
 
                                     ci_len = 16 if (ci+1)*16 <= Ci else Ci - ci*16
 
+                                    
+                                    # print("cur_di_offset:", cur_di_offset)
+                                    # print("t:", t)
+                                    # print("cur_di_offset+t:", cur_di_offset+t)
+                                    
                                     # 注意：python中切片右边是一个开区间，factor中的endoffset是一个闭区间
-                                    cut_input_data = inputs[n, d+t, hi_cut_offset:hi_cut_offset_end + 1, wi_cut_offset:wi_cut_offset_end + 1, ci*16:ci*16+ci_len]
+                                    cut_input_data = inputs[n, cur_di_offset+t, hi_cut_offset:hi_cut_offset_end + 1, wi_cut_offset:wi_cut_offset_end + 1, ci*16:ci*16+ci_len]
                                     cut_input_data = cut_input_data[np.newaxis, np.newaxis, :, :, :]
 
                                     split_h_begin = -cur_hi_offset if cur_hi_offset < 0 else 0
@@ -168,6 +181,33 @@ def conv3d():
     outputs = outputs.transpose(0, 4, 1, 2, 3)
     print("outputs_transpose: ", outputs)
     print("outputs_transpose_shape: ", outputs.shape)
+
+    # tensorflow 1.x
+    # with tf.device("cpu"):
+    #     with tf.Session() as sess:
+    #         tf_input = tf.placeholder("float32", shape = inputs.shape)
+    #         tf_kernel = tf.placeholder("float32", shape = kernels.shape)
+    #         conv = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "SAME")
+    #         # conv = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "VALID", dilations = [1, dilation_d, dilation_h, dilation_w, 1])
+    #         feed_dict = {tf_input:inputs, tf_kernel:kernels}
+    #         sess.run(tf.global_variables_initializer())
+    #         tf_out = sess.run(conv, feed_dict = feed_dict)
+    #         cpu_in_man = tf_out.transpose(0, 4, 1, 2, 3)
+    #         print("conv3d_shape:cpu_output", cpu_in_man.shape)
+    #         np.testing.assert_allclose(outputs, cpu_in_man, atol=1e-3, rtol=1e-3)
+    #         print("check is OK")
+
+    # tensorflow 2.x
+    tf_input = inputs
+    tf_kernel = kernels
+    cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "VALID")
+    # cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "VALID", dilations = [1, dilation_d, dilation_h, dilation_w, 1])
+    cpu_tf_out = tf.transpose(cpu_tf_out, perm=[0, 4, 1, 2, 3])
+    print("conv3d_shape:cpu_output", cpu_tf_out.shape)
+    np.testing.assert_allclose(outputs, cpu_tf_out, atol=1e-3, rtol=1e-3)
+    print("check is OK")
+
+                
 
 
 
