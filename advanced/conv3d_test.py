@@ -14,11 +14,11 @@ def conv3d():
     R = 3
     S = 3
 
-    stride_d = 2
-    stride_h = 2
-    stride_w = 2
+    stride_d = 1
+    stride_h = 1
+    stride_w = 1
 
-    dilation_d = 1
+    dilation_d = 1 #目前做的 dilation_d只能等于1
     dilation_h = 1
     dilation_w = 1
 
@@ -107,8 +107,10 @@ def conv3d():
                                 cur_di_offset = d * stride_d - pad_head
                                 cur_hi_offset = h * stride_h - pad_top
                                 cur_wi_offset = w * stride_w - pad_left
-                                cur_hi_offset_end = (1 + h*1 - 1) * stride_h + R - pad_top - 1 # 第一个1指的是一次计算输出的ho长度，这里是1;h*1,这个1指的也是一次计算输出ho的长度
-                                cur_wi_offset_end = (1 + w*1 - 1) * stride_w + S - pad_left - 1
+                                # cur_hi_offset_end = (1 + h*1 - 1) * stride_h + R - pad_top - 1 # 第一个1指的是一次计算输出的ho长度，这里是1;h*1,这个1指的也是一次计算输出ho的长度, 应该是actual_r 和 actual_s，感觉这里R和S应该是错了
+                                # cur_wi_offset_end = (1 + w*1 - 1) * stride_w + S - pad_left - 1
+                                cur_hi_offset_end = (1 + h*1 - 1) * stride_h + actual_r - pad_top - 1 # 第一个1指的是一次计算输出的ho长度，这里是1;h*1,这个1指的也是一次计算输出ho的长度
+                                cur_wi_offset_end = (1 + w*1 - 1) * stride_w + actual_s - pad_left - 1
                                 cur_hi_len = Hi - cur_hi_offset if cur_hi_offset_end > Hi - 1 else cur_hi_offset_end - cur_hi_offset + 1
                                 cur_wi_len = Wi - cur_wi_offset if cur_wi_offset_end > Wi - 1 else cur_wi_offset_end - cur_wi_offset + 1
 
@@ -156,8 +158,6 @@ def conv3d():
 
                                     kernel[:, :, :, :ci_len, :co_len] = kernels[t, :, :, ci*16:ci*16+ci_len, c*32:c*32+co_len]
 
-                                    
-                                    # print("cut_input_data:", cut_input_data)
                                 
                                 # 计算
                                 # 1.根据dilation将kernel pad 0, 也可以根据dilation间隔取input数据
