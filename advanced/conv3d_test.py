@@ -6,8 +6,8 @@ import tensorflow as tf
 def conv3d():
     N = 2
     Di = 9
-    Hi = 9
-    Wi = 9
+    Hi = 10  # 如果为偶数，左上不pad，右下pad 1行1列
+    Wi = 10
     Ci = 17
     Co = 33
     T = 3
@@ -15,28 +15,28 @@ def conv3d():
     S = 3
 
     stride_d = 1
-    stride_h = 1
-    stride_w = 1
+    stride_h = 2
+    stride_w = 2
 
     dilation_d = 1 #目前做的 dilation_d只能等于1
     dilation_h = 1
     dilation_w = 1
 
     # SAME 
-    # pad_head = 1
-    # pad_tail = 1
-    # pad_top = 1
-    # pad_bottom = 1
-    # pad_left = 1
-    # pad_right = 1
+    pad_head = 1
+    pad_tail = 1
+    pad_top = 0
+    pad_bottom = 1
+    pad_left = 0
+    pad_right = 1
 
     # VALID
-    pad_head = 0
-    pad_tail = 0
-    pad_top = 0
-    pad_bottom = 0
-    pad_left = 0
-    pad_right = 0
+    # pad_head = 0
+    # pad_tail = 0
+    # pad_top = 0
+    # pad_bottom = 0
+    # pad_left = 0
+    # pad_right = 0
 
     actual_t = (T - 1) * dilation_d + 1
     actual_r = (R - 1) * dilation_h + 1
@@ -54,8 +54,8 @@ def conv3d():
     print("kernel_shape should be: (%d, %d, %d, %d, %d)", T, R, S, Ci, Co)
     print("output_shape should be: (%d, %d, %d, %d, %d)", N, Do, Ho, Wo, Co)
 
-    inputs = np.random.randint(low = 1, high = 2, size = (N, Di, Hi, Wi, Ci)).astype("float32")
-    kernels = np.random.randint(low = 1, high = 2, size = (T, R, S, Ci, Co)).astype("float32")
+    inputs = np.random.randn(N, Di, Hi, Wi, Ci).astype("float32")
+    kernels = np.random.randn(T, R, S, Ci, Co).astype("float32")
 
     # print("inputs:", inputs)
     # print("kernels:", kernels)
@@ -129,7 +129,7 @@ def conv3d():
                                 # 如果t_beign = 0，t_end = t_loop_num时可用下面的if判断，这样效率低一些，skip the head block 和  drop the tail block 可以少一些循环
                                 # if (cur_hi_len > 0 and cur_wi_len > 0 and cur_di_offset + t >= 0 and cur_di_offset + t < Di) :
 
-                                if (cur_hi_len > 0 and cur_wi_len > 0 and cur_di_offset + t >= 0 and cur_di_offset + t < Di) :
+                                if (cur_hi_len > 0 and cur_wi_len > 0) :
 
                                     hi_cut_offset =  0 if cur_hi_offset < 0 else  cur_hi_offset
                                     hi_cut_offset_end = Hi - 1 if cur_hi_offset_end > Hi - 1 else cur_hi_offset_end
@@ -200,7 +200,7 @@ def conv3d():
     # tensorflow 2.x
     tf_input = inputs
     tf_kernel = kernels
-    cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "VALID")
+    cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "SAME")
     # cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "VALID", dilations = [1, dilation_d, dilation_h, dilation_w, 1])
     cpu_tf_out = tf.transpose(cpu_tf_out, perm=[0, 4, 1, 2, 3])
     print("conv3d_shape:cpu_output", cpu_tf_out.shape)
