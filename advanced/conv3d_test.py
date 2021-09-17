@@ -1,50 +1,43 @@
 import numpy as np
-# from numpy.core.fromnumeric import shape
-# import tensorflow.compat.v1 as tf
 import tensorflow as tf
 
-def conv3d():
-    N = 2
-    Di = 9
-    Hi = 10  # 如果为偶数，左上不pad，右下pad 1行1列
-    Wi = 10
-    Ci = 17
-    Co = 33
-    T = 3
-    R = 3
-    S = 3
+def conv3d(input_shape, kernel_shape, strides = [1, 1, 1, 1, 1], dilations = [1, 1, 1, 1, 1], padding = 'VALID'):
+    N, Di, Hi, Wi, Ci = input_shape
+    T, R, S, _, Co = kernel_shape
+    _, stride_d, stride_h, stride_w, _ = strides
+    _, dilation_d, dilation_h, dilation_w, _ = dilations #目前做的 dilation_d只能等于1
 
-    stride_d = 1
-    stride_h = 2
-    stride_w = 2
-
-    dilation_d = 1 #目前做的 dilation_d只能等于1
-    dilation_h = 1
-    dilation_w = 1
-
-    # SAME 
-    pad_head = 1
-    pad_tail = 1
-    pad_top = 0
-    pad_bottom = 1
-    pad_left = 0
-    pad_right = 1
-
-    # VALID
-    # pad_head = 0
-    # pad_tail = 0
-    # pad_top = 0
-    # pad_bottom = 0
-    # pad_left = 0
-    # pad_right = 0
-
+    if padding == 'SAME':   # SAME模式pad数量是根据stride=1，dilation=1
+        pad_D = T - 1 # (Di -1) * 1 + T - Di
+        pad_H = R - 1 # (Hi -1) * 1 + R - Hi
+        pad_W = S - 1 # (Wi -1) * 1 + S - Wi
+        pad_head = int(pad_D / 2 if Di % 2 != 0 else (pad_D - 1) / 2)
+        pad_tail = int(pad_D / 2 if Di % 2 != 0 else (pad_D + 1) / 2)
+        pad_top = int(pad_H / 2 if Hi % 2 != 0 else (pad_H - 1) / 2)
+        pad_bottom = int(pad_H / 2 if Hi % 2 != 0 else (pad_H + 1) / 2)
+        pad_left = int(pad_W / 2 if Wi % 2 != 0 else (pad_W - 1) / 2)
+        pad_right = int(pad_W / 2 if Wi % 2 != 0 else (pad_W + 1) / 2)
+        print('pad_head', pad_head)
+        print('pad_tail', pad_tail)
+        print('pad_top', pad_top)
+        print('pad_bottom', pad_bottom)
+        print('pad_left', pad_left)
+        print('pad_right', pad_right)
+    else :
+        pad_head = 0
+        pad_tail = 0
+        pad_top = 0
+        pad_bottom = 0
+        pad_left = 0
+        pad_right = 0
+        
     actual_t = (T - 1) * dilation_d + 1
     actual_r = (R - 1) * dilation_h + 1
     actual_s = (S - 1) * dilation_w + 1
 
-    Do = int((Di + pad_head + pad_tail - actual_t)/ stride_d + 1)
-    Ho = int((Hi + pad_top + pad_bottom - actual_r)/ stride_h + 1)
-    Wo = int((Wi + pad_left + pad_right - actual_s)/ stride_w + 1)
+    Do = int((Di + pad_head + pad_tail - actual_t)/ stride_d) + 1
+    Ho = int((Hi + pad_top + pad_bottom - actual_r)/ stride_h) + 1
+    Wo = int((Wi + pad_left + pad_right - actual_s)/ stride_w) + 1
 
     print("Do:", Do)
     print("Ho:", Ho)
@@ -56,10 +49,11 @@ def conv3d():
 
     inputs = np.random.randn(N, Di, Hi, Wi, Ci).astype("float32")
     kernels = np.random.randn(T, R, S, Ci, Co).astype("float32")
+    # inputs = np.random.randint(size=(N, Di, Hi, Wi, Ci), low=1.0, high=2.0).astype('float32')
+    # kernels = np.random.randint(size=(T, R, S, Ci, Co), low=1.0, high=2.0).astype('float32')
 
     # print("inputs:", inputs)
     # print("kernels:", kernels)
-
     print("inputs_shape:", inputs.shape)
     print("kernels_shape:", kernels.shape)
 
@@ -101,7 +95,7 @@ def conv3d():
                         t_beign = (pad_head - d * stride_d) if d * stride_d < pad_head else 0
                         # drop the tail block
                         t_end = (t_loop_num - pad_tail + (do_loop_num - d - 1) * stride_d) if (do_loop_num - d - 1) * stride_d < pad_tail else t_loop_num
-
+                        
                         for t in range(t_beign, t_end):
                             for ci in range(ci_loop_num):    
                                 cur_di_offset = d * stride_d - pad_head
@@ -140,10 +134,6 @@ def conv3d():
                                     ci_len = 16 if (ci+1)*16 <= Ci else Ci - ci*16
 
                                     
-                                    # print("cur_di_offset:", cur_di_offset)
-                                    # print("t:", t)
-                                    # print("cur_di_offset+t:", cur_di_offset+t)
-                                    
                                     # 注意：python中切片右边是一个开区间，factor中的endoffset是一个闭区间
                                     cut_input_data = inputs[n, cur_di_offset+t, hi_cut_offset:hi_cut_offset_end + 1, wi_cut_offset:wi_cut_offset_end + 1, ci*16:ci*16+ci_len]
                                     cut_input_data = cut_input_data[np.newaxis, np.newaxis, :, :, :]
@@ -168,7 +158,6 @@ def conv3d():
                                     output[:,:,:,:,i] = np.sum(input.reshape(R, S, 16) * kernel[:,:,:,:,i].reshape(R, S, 16))
                                 output_data += output
                                 # 3.将1*32的向量reshape为(1,1,1,1,32),放到outputs对应位置
-                                # print("output_data:", output_data)
                         
                         # print("Co:", Co)
                         # print("c:", c)
@@ -176,43 +165,24 @@ def conv3d():
                         # print(outputs[n, d, h, w, c*32:c*32+co_len].shape, output_data[:, :, :, :, :co_len].shape)
                         outputs[n, d, h, w, c*32:c*32+co_len] = output_data[:, :, :, :, :co_len]
 
-    # print("outputs: ", outputs)
     print("outputs_shape: ", outputs.shape)
     outputs = outputs.transpose(0, 4, 1, 2, 3)
-    print("outputs_transpose: ", outputs)
+    # print("outputs_transpose: ", outputs)
     print("outputs_transpose_shape: ", outputs.shape)
-
-    # tensorflow 1.x
-    # with tf.device("cpu"):
-    #     with tf.Session() as sess:
-    #         tf_input = tf.placeholder("float32", shape = inputs.shape)
-    #         tf_kernel = tf.placeholder("float32", shape = kernels.shape)
-    #         conv = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "SAME")
-    #         # conv = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "VALID", dilations = [1, dilation_d, dilation_h, dilation_w, 1])
-    #         feed_dict = {tf_input:inputs, tf_kernel:kernels}
-    #         sess.run(tf.global_variables_initializer())
-    #         tf_out = sess.run(conv, feed_dict = feed_dict)
-    #         cpu_in_man = tf_out.transpose(0, 4, 1, 2, 3)
-    #         print("conv3d_shape:cpu_output", cpu_in_man.shape)
-    #         np.testing.assert_allclose(outputs, cpu_in_man, atol=1e-3, rtol=1e-3)
-    #         print("check is OK")
 
     # tensorflow 2.x
     tf_input = inputs
     tf_kernel = kernels
-    cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "SAME")
-    # cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = [1, stride_d, stride_h, stride_w, 1], padding = "VALID", dilations = [1, dilation_d, dilation_h, dilation_w, 1])
+    cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = strides, dilations = dilations, padding = padding)
     cpu_tf_out = tf.transpose(cpu_tf_out, perm=[0, 4, 1, 2, 3])
     print("conv3d_shape:cpu_output", cpu_tf_out.shape)
     np.testing.assert_allclose(outputs, cpu_tf_out, atol=1e-3, rtol=1e-3)
     print("check is OK")
 
-                
-
 
 
 if __name__ == "__main__":
-    conv3d()
+    conv3d(input_shape = [2, 9, 10, 10, 32], kernel_shape = [5, 5, 5, 32, 64], strides = [1, 2, 2, 2, 1], padding = 'SAME')
 
 # %%
 # import numpy as  np
