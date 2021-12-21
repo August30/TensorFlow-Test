@@ -1,22 +1,30 @@
+#!/usr/bin/python3
+
 import numpy as np
 import tensorflow as tf
 
-def conv3d(input_shape, kernel_shape, strides = [1, 1, 1, 1, 1], dilations = [1, 1, 1, 1, 1], padding = 'VALID'):
+def conv3d(input_shape, kernel_shape, strides = [1, 1, 1, 1, 1], dilations = [1, 1, 1, 1, 1], padding = "VALID"):
     N, Di, Hi, Wi, Ci = input_shape
     T, R, S, _, Co = kernel_shape
     _, stride_d, stride_h, stride_w, _ = strides
     _, dilation_d, dilation_h, dilation_w, _ = dilations #目前做的 dilation_d只能等于1
 
-    if padding == 'SAME':   # SAME模式pad数量是根据stride=1，dilation=1
-        pad_D = T - 1 # (Di -1) * 1 + T - Di
-        pad_H = R - 1 # (Hi -1) * 1 + R - Hi
-        pad_W = S - 1 # (Wi -1) * 1 + S - Wi
-        pad_head = int(pad_D / 2 if Di % 2 != 0 else (pad_D - 1) / 2)
-        pad_tail = int(pad_D / 2 if Di % 2 != 0 else (pad_D + 1) / 2)
-        pad_top = int(pad_H / 2 if Hi % 2 != 0 else (pad_H - 1) / 2)
-        pad_bottom = int(pad_H / 2 if Hi % 2 != 0 else (pad_H + 1) / 2)
-        pad_left = int(pad_W / 2 if Wi % 2 != 0 else (pad_W - 1) / 2)
-        pad_right = int(pad_W / 2 if Wi % 2 != 0 else (pad_W + 1) / 2)
+    if padding == "SAME" :   
+        DDi = Di + (Di -1) * (dilation_d - 1)
+        DHi = Hi + (Hi -1) * (dilation_h - 1)
+        DWi = Wi + (Wi -1) * (dilation_w - 1)
+        Do = int((DDi + stride_d - 1) / stride_d) # 向上取整
+        Ho = int((DHi + stride_h - 1) / stride_h) # 向上取整
+        Wo = int((DWi + stride_w - 1) / stride_w) # 向上取整
+        pad_D = max((Do - 1) * stride_d + T - DDi, 0)
+        pad_H = max((Ho - 1) * stride_h + R - DHi, 0)
+        pad_W = max((Wo - 1) * stride_w + S - DWi, 0)
+        pad_head = int(pad_D / 2)
+        pad_tail = pad_D - pad_head
+        pad_top = int(pad_H / 2)
+        pad_bottom = pad_H - pad_top
+        pad_left = int(pad_W / 2)
+        pad_right = pad_W - pad_left
         print('pad_head', pad_head)
         print('pad_tail', pad_tail)
         print('pad_top', pad_top)
@@ -166,23 +174,65 @@ def conv3d(input_shape, kernel_shape, strides = [1, 1, 1, 1, 1], dilations = [1,
                         outputs[n, d, h, w, c*32:c*32+co_len] = output_data[:, :, :, :, :co_len]
 
     print("outputs_shape: ", outputs.shape)
-    outputs = outputs.transpose(0, 4, 1, 2, 3)
+    # outputs = outputs.transpose(0, 4, 1, 2, 3)
     # print("outputs_transpose: ", outputs)
-    print("outputs_transpose_shape: ", outputs.shape)
+    # print("outputs_transpose_shape: ", outputs.shape)
 
     # tensorflow 2.x
     tf_input = inputs
     tf_kernel = kernels
     cpu_tf_out = tf.nn.conv3d(tf_input, tf_kernel, strides = strides, dilations = dilations, padding = padding)
-    cpu_tf_out = tf.transpose(cpu_tf_out, perm=[0, 4, 1, 2, 3])
+    # cpu_tf_out = tf.transpose(cpu_tf_out, perm=[0, 4, 1, 2, 3])
     print("conv3d_shape:cpu_output", cpu_tf_out.shape)
     np.testing.assert_allclose(outputs, cpu_tf_out, atol=1e-3, rtol=1e-3)
     print("check is OK")
 
+    # bpk
+    out_scale_np = np.random.randint(10, size=cpu_tf_out.shape)
+    out_scale = tf.constant(out_scale_np, dtype="float32")
+    with tf.GradientTape() as g:
+        g.watch(cpu_tf_out)
+        f = tf.reduce_sum(tf.multiply(cpu_tf_out, out_scale))
+    d_out = g.gradient(f, cpu_tf_out)
+    bpk = tf.compat.v1.nn.conv3d_backprop_filter(input=tf_input, filter_sizes=kernels.shape, out_backprop=d_out, strides=strides, padding=padding, dilations=[1, 1, 1, 1, 1])
+    print("bpk:", bpk.shape)
 
 
 if __name__ == "__main__":
-    conv3d(input_shape = [2, 9, 10, 10, 32], kernel_shape = [5, 5, 5, 32, 64], strides = [1, 2, 2, 2, 1], padding = 'SAME')
+    # conv3d(input_shape = [1, 1, 1, 16, 2], kernel_shape = [1, 1, 1, 2, 32], strides = [1, 1, 1, 1, 1], padding = "VALID")
+    # input = np.ones((1, 1, 1, 16, 4), dtype="float32")
+    # d_out = np.ones((1, 1, 1, 16, 32), dtype="float32")
+    # input
+    np.set_printoptions(precision=6,threshold=np.inf)
+    input_shape = (1, 1, 1, 16, 3)
+    input = np.zeros(input_shape, dtype="float32")
+    N, D, H, W, C = input_shape
+    for d in range(D):
+        for h in range(H):
+            for w in range(W):
+                for c in range(C):
+                    input[:,d,h,w,c] = c
+    print("input:", input)
+
+    kernel_shape = (1, 1, 1, 3, 32)
+
+    d_out_shape = (1, 1, 1, 16, 32)
+    d_out = np.zeros((1, 1, 1, 16, 32), dtype="float32")
+    N, Do, Ho, Wo, Co = d_out_shape
+    for d in range(Do):
+        for h in range(Ho):
+            for w in range(Wo):
+                for c in range(Co):
+                    d_out[:,d,h,w,c] = c
+    print("d_out:", d_out)
+   
+    kernel = tf.compat.v1.nn.conv3d_backprop_filter(input=input, filter_sizes=kernel_shape, out_backprop=d_out, strides = [1, 1, 1, 1, 1], dilations = [1, 1, 1, 1, 1], padding = "VALID")
+    print("kernel:", kernel.shape)
+    print(kernel)
+
+    # input = np.zeros((1, 1, 16, 20), dtype="float32")
+    # kernel = np.zeros((1, 1, 2, 32), dtype="float32")
+    # cpu_tf_out = tf.nn.conv2d(input, kernel, strides = [1, 1, 1, 1], dilations = [1, 1, 1, 1], padding = "VALID")
 
 # %%
 # import numpy as  np
